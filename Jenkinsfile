@@ -3,10 +3,10 @@ pipeline {
 
     environment {
         AWS_REGION = "ap-south-1"
-        AWS_ACCOUNT_ID = "YOUR_AWS_ACCOUNT_ID"
+        AWS_ACCOUNT_ID = "758024567313"
 
-        BACKEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/backend-app"
-        FRONTEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend-app"
+        BACKEND_IMAGE = "758024567313.dkr.ecr.${AWS_REGION}.amazonaws.com/backend-app"
+        FRONTEND_IMAGE = "758024567313.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend-app"
 
         KUBE_NAMESPACE = "default"
     }
@@ -21,12 +21,13 @@ pipeline {
             }
         }
 
-        stage('Login to ECR') {
+        stage('Configure AWS Credentials') {
             steps {
-                sh '''
-                aws ecr get-login-password --region $AWS_REGION \
-                | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-                '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+                    sh '''
+                    aws sts get-caller-identity
+                    '''
+                }
             }
         }
 
@@ -60,22 +61,27 @@ EOF
 
         stage('Deploy to EKS') {
             steps {
-                sh '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+                    sh '''
+aws eks update-kubeconfig --name YOUR_EKS_CLUSTER --region $AWS_REGION
+
 kubectl apply -f k8s/backend-deployment.yaml -n $KUBE_NAMESPACE
 kubectl apply -f k8s/frontend-deployment.yaml -n $KUBE_NAMESPACE
+
 kubectl rollout restart deployment backend -n $KUBE_NAMESPACE
 kubectl rollout restart deployment frontend -n $KUBE_NAMESPACE
 '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo "Pipeline executed successfully 🚀"
+            echo "✅ Pipeline executed successfully"
         }
         failure {
-            echo "Pipeline failed ❌"
+            echo "❌ Pipeline failed"
         }
     }
 }
