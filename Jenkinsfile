@@ -3,73 +3,79 @@ pipeline {
 
     environment {
         AWS_REGION = "ap-south-1"
-        ECR_BACKEND = "758024567313.dkr.ecr.ap-south-1.amazonaws.com/backend-repo"
-        ECR_FRONTEND = "758024567313.dkr.ecr.ap-south-1.amazonaws.com/frontend-repo"
+        AWS_ACCOUNT_ID = "YOUR_AWS_ACCOUNT_ID"
+
+        BACKEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/backend-app"
+        FRONTEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend-app"
+
+        KUBE_NAMESPACE = "default"
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
                 git branch: 'main',
-                url: 'https://github.com/Avenis3010/three-tier-eks-cluster'
-            }
-        }
-
-        stage('Docker Build Backend') {
-            steps {
-                dir('backend') {
-                    sh 'docker build -t backend-app .'
-                }
-            }
-        }
-
-        stage('Docker Build Frontend') {
-            steps {
-                dir('frontend') {
-                    sh 'docker build -t frontend-app .'
-                }
+                credentialsId: 'git-token',
+                url: 'https://github.com/Avenis3010/three-tier-eks-cluster.git'
             }
         }
 
         stage('Login to ECR') {
             steps {
                 sh '''
-                aws ecr get-login-password --region $AWS_REGION | \
-                docker login --username AWS --password-stdin \
-                758024567313.dkr.ecr.ap-south-1.amazonaws.com
+                aws ecr get-login-password --region $AWS_REGION \
+                | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
                 '''
             }
         }
 
-        stage('Push Backend') {
+        stage('Build & Push Backend (Kaniko)') {
             steps {
                 sh '''
-                docker tag backend-app:latest $ECR_BACKEND:latest
-                docker push $ECR_BACKEND:latest
-                '''
+cat <<EOF > /kaniko/.docker/config.json
+{
+  "credsStore": ""
+}
+EOF
+
+/kaniko/executor \
+--context=$WORKSPACE/backend \
+--dockerfile=$WORKSPACE/backend/Dockerfile \
+--destination=$BACKEND_IMAGE:latest
+'''
             }
         }
 
-        stage('Push Frontend') {
+        stage('Build & Push Frontend (Kaniko)') {
             steps {
                 sh '''
-                docker tag frontend-app:latest $ECR_FRONTEND:latest
-                docker push $ECR_FRONTEND:latest
-                '''
+/kaniko/executor \
+--context=$WORKSPACE/frontend \
+--dockerfile=$WORKSPACE/frontend/Dockerfile \
+--destination=$FRONTEND_IMAGE:latest
+'''
             }
         }
 
         stage('Deploy to EKS') {
             steps {
                 sh '''
-                aws eks update-kubeconfig --region ap-south-1 --name three-tier-cluster
-
-                kubectl apply -f k8s/
-                kubectl rollout restart deployment backend -n three-tier
-                kubectl rollout restart deployment frontend -n three-tier
-                '''
+kubectl apply -f k8s/backend-deployment.yaml -n $KUBE_NAMESPACE
+kubectl apply -f k8s/frontend-deployment.yaml -n $KUBE_NAMESPACE
+kubectl rollout restart deployment backend -n $KUBE_NAMESPACE
+kubectl rollout restart deployment frontend -n $KUBE_NAMESPACE
+'''
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline executed successfully 🚀"
+        }
+        failure {
+            echo "Pipeline failed ❌"
         }
     }
 }
