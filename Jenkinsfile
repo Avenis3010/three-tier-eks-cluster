@@ -5,8 +5,8 @@ pipeline {
         AWS_REGION = "ap-south-1"
         AWS_ACCOUNT_ID = "758024567313"
 
-        BACKEND_IMAGE = "758024567313.dkr.ecr.${AWS_REGION}.amazonaws.com/backend-app"
-        FRONTEND_IMAGE = "758024567313.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend-app"
+        BACKEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/backend-app"
+        FRONTEND_IMAGE = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend-app"
 
         KUBE_NAMESPACE = "default"
     }
