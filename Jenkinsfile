@@ -31,23 +31,41 @@ pipeline {
             }
         }
 
-        stage('Build & Push Backend (Kaniko)') {
-            steps {
-                sh '''
-cat <<EOF > /kaniko/.docker/config.json
-{
-  "credsStore": ""
-}
-EOF
-
-/kaniko/executor \
---context=$WORKSPACE/backend \
---dockerfile=$WORKSPACE/backend/Dockerfile \
---destination=$BACKEND_IMAGE:latest
+       stage('Build Backend') {
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: kaniko
+    image: gcr.io/kaniko-project/executor:latest
+    command:
+    - sleep
+    args:
+    - 999999
+    volumeMounts:
+    - name: docker-config
+      mountPath: /kaniko/.docker
+  volumes:
+  - name: docker-config
+    emptyDir: {}
 '''
-            }
         }
+    }
 
+    steps {
+        container('kaniko') {
+            sh '''
+            /kaniko/executor \
+            --dockerfile=backend/Dockerfile \
+            --context=$WORKSPACE/backend \
+            --destination=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/backend-app:latest
+            '''
+        }
+    }
+}
         stage('Build & Push Frontend (Kaniko)') {
             steps {
                 sh '''
