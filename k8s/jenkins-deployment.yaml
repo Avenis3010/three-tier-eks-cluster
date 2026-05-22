@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: jenkins
+  namespace: jenkins
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: jenkins
+
+  template:
+    metadata:
+      labels:
+        app: jenkins
+
+    spec:
+      serviceAccountName: jenkins
+
+      containers:
+      - name: jenkins
+
+        image: 758024567313.dkr.ecr.ap-south-1.amazonaws.com/custom-jenkins:v1
+
+        ports:
+        - containerPort: 8080
+
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+
+          limits:
+            memory: "1Gi"
+            cpu: "500m"

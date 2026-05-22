@@ -1,0 +1,21 @@
+# Terraform
+.terraform/
+terraform/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# AWS
+.aws/
+
+# Kubernetes
+*.kubeconfig
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
